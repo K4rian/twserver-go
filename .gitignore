@@ -1,0 +1,12 @@
+# Settings
+*.json
+
+# Logs
+*.log
+
+# VSCode
+.vscode/
+
+# Distribution
+backup/
+www/
