@@ -22,7 +22,7 @@ A [TiddlyWiki](https://github.com/Jermolene/TiddlyWiki5) HTTP Server written in 
 
 
 ### Setup
-- __[Download the latest build](/releases)__ for your platform.
+- __[Download the latest build](https://github.com/k4rian/twserver-go/releases)__ for your platform.
 - Extract the archive.
 - `cd` into the directory that was just created.
 - Put the TeddlyWiki's `empty.html` file inside the `www` subfolder.
