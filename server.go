@@ -58,6 +58,29 @@ func readConfig(filename *string) error {
 	return cfgFile.Close()
 }
 
+func makeBackup(buf *[]byte) {
+	indexHTMLReplacer := strings.NewReplacer(".html", "", ".htm", "")
+	fileNameStrReplacer := strings.NewReplacer(
+		":name:", indexHTMLReplacer.Replace(AppConf.IndexFile),
+		":date:", strconv.FormatInt(time.Now().Unix(), 10),
+	)
+
+	indexFilePath := filepath.Join(AppConf.DocumentRootDir, AppConf.IndexFile)
+	backupFilePath := filepath.Join(
+		AppConf.BackupDir,
+		fileNameStrReplacer.Replace(AppConf.BackupFileFormat),
+	)
+	zipFilePath := backupFilePath + ".zip"
+
+	if writeFile(&backupFilePath, buf) == nil {
+		copyFile(&backupFilePath, &indexFilePath)
+
+		if zipFile(&backupFilePath, &zipFilePath) == nil {
+			delFile(&backupFilePath)
+		}
+	}
+}
+
 func httpHandleReq(w http.ResponseWriter, r *http.Request) {
 	(w).Header().Set("Access-Control-Allow-Methods", "HEAD, OPTIONS, GET, PUT")
 	(w).Header().Set("dav", "'tw5/put")
@@ -87,34 +110,7 @@ func httpHandleReq(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		if _, err := os.Stat(AppConf.BackupDir); os.IsNotExist(err) {
-			err := os.MkdirAll(AppConf.BackupDir, os.ModePerm)
-			if err != nil {
-				log.Print(fmt.Sprintf("[ERROR]httpHandleReq -> Unable to create the backup directory: '%s'.", AppConf.BackupDir), err)
-				break
-			}
-		}
-
-		indexHTMLReplacer := strings.NewReplacer(".html", "", ".htm", "")
-		fileNameStrReplacer := strings.NewReplacer(
-			":name:", indexHTMLReplacer.Replace(AppConf.IndexFile),
-			":date:", strconv.FormatInt(time.Now().Unix(), 10),
-		)
-
-		indexFilePath := filepath.Join(AppConf.DocumentRootDir, AppConf.IndexFile)
-		backupFilePath := filepath.Join(
-			AppConf.BackupDir,
-			fileNameStrReplacer.Replace(AppConf.BackupFileFormat),
-		)
-		zipFilePath := backupFilePath + ".zip"
-
-		if writeFile(&backupFilePath, &bodyBytes) == nil {
-			copyFile(&backupFilePath, &indexFilePath)
-
-			if zipFile(&backupFilePath, &zipFilePath) == nil {
-				delFile(&backupFilePath)
-			}
-		}
+		go makeBackup(&bodyBytes)
 	default:
 		log.Print("[WARN]httpHandleReq -> Unsupported HTTP request method. Only GET/PUT methods are supported.")
 	}
@@ -123,7 +119,7 @@ func httpHandleReq(w http.ResponseWriter, r *http.Request) {
 func init() {
 	binPath, err := os.Executable()
 	if err != nil {
-		fmt.Printf("[ERROR]init -> Unable to get the path name for the binary.")
+		fmt.Printf("[ERROR]init -> Unable to get the binary's path.")
 		return
 	}
 
@@ -132,11 +128,20 @@ func init() {
 	logFilePath := filepath.Join(binDirPath, (strings.Replace(binName, ".exe", "", 1) + ".log"))
 	confFilePath := filepath.Join(binDirPath, (strings.Replace(binName, ".exe", "", 1) + ".json"))
 
+	// Inits the logs
 	initLog(&logFilePath)
 
-	// Read the config file if present
+	// Reads the config file if present
 	if _, err := os.Stat(confFilePath); err == nil {
 		readConfig(&confFilePath)
+	}
+
+	// Creates the backup directory if it doesn't exist
+	if _, err := os.Stat(AppConf.BackupDir); os.IsNotExist(err) {
+		err := os.MkdirAll(AppConf.BackupDir, os.ModePerm)
+		if err != nil {
+			log.Print(fmt.Sprintf("[ERROR]init -> Unable to create the backup directory: '%s'.", AppConf.BackupDir), err)
+		}
 	}
 }
 
