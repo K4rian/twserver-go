@@ -18,10 +18,12 @@ A [TiddlyWiki](https://github.com/Jermolene/TiddlyWiki5) HTTP Server written in 
 ## Getting started
 
 ### Prerequisites
+
 - [TiddlyWiki empty HTML file](https://tiddlywiki.com/#GettingStarted).
 
 
 ### Setup
+
 - __[Download the latest build](https://github.com/k4rian/twserver-go/releases)__ for your platform.
 - Extract the archive.
 - `cd` into the directory that was just created.
@@ -37,22 +39,42 @@ All server settings can be tweaked using a configuration file located beside the
 The configuration file must use the same name as the binary and must be saved with the `.json` extension.
 
 - Create a configuration file in `JSON` format (on Linux/macOS):
+
 ```bash
 touch twserver.json
 ```
 
 - Open the file with your favorite text editor and write the following values *(default)*:
+
 ```json
 {
-    "Port": 8080,
-    "DocumentRootDir": "./www",
-    "IndexFile": "index.html",
-    "BackupDir": "./backup",
-    "BackupFileFormat": ":name:.:date:.html"
+  "Port": 8080,
+  "DocumentRootDir": "./www",
+  "IndexFile": "index.html",
+  "BackupDir": "./backup",
+  "BackupFileFormat": ":name:.:date:.html",
+  "ServeDirs": []
 }
 ```
 
 - Tweak the values as needed, save the file and restart the server.
+
+By default, the HTTP server only serves the index file and rejects any other request. To serve one or more custom directories containing extra resources (such as images), you have to add them by tweaking the "ServeDirs" value in the configuration file.
+
+- Example: Add the `images` directory located in `./images` and accessed via the URL `<wiki_url>/img/`:
+
+```json
+{
+  "ServeDirs": [
+    {
+      "URL": "/img/",
+      "Path": "./images"
+    }
+  ]
+}
+```
+
+- Any images from the `./images` directory can now be reached via `<wiki_url>/img/` and can be displayed inside any wiki post.
 
 
 
