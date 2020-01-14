@@ -59,7 +59,7 @@ touch twserver.json
 
 - Tweak the values as needed, save the file and restart the server.
 
-By default, the HTTP server only serves the index file and rejects any other request. To serve one or more custom directories containing extra resources (such as images), you have to add them by tweaking the "ServeDirs" value in the configuration file.
+By default, the HTTP server only serves the index file and rejects any other request. To serve one or more custom directories containing extra resources (such as images), you have to add them by tweaking the `ServeDirs` value in the configuration file.
 
 - Example: Add the `images` directory located in `./images` and accessed via the URL `<wiki_url>/img/`:
 
@@ -74,7 +74,7 @@ By default, the HTTP server only serves the index file and rejects any other req
 }
 ```
 
-- Any images from the `./images` directory can now be reached via `<wiki_url>/img/` and can be displayed inside any wiki post.
+- Any image from the `./images` directory can now be reached via `<wiki_url>/img/` and can be displayed inside any wiki post.
 
 
 
