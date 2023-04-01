@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type httpServeDir struct {
@@ -20,32 +24,55 @@ type httpServeDir struct {
 
 // serverConf defines the server configuration file.
 type serverConf struct {
+	Host             string
 	Port             int
 	DocumentRootDir  string
 	IndexFile        string
 	BackupDir        string
 	BackupFileFormat string
 	ServeDirs        []httpServeDir
+	LogFileName      string
+	LogMaxSize       int // MB
+	LogMaxBackups    int
+	LogMaxAge        int // Days
+	LogCompress      bool
 }
 
 // config holds the server configuration file values.
 var config = serverConf{
+	Host:             "",
 	Port:             8080,
 	DocumentRootDir:  "./www",
 	IndexFile:        "index.html",
 	BackupDir:        "./backup",
 	BackupFileFormat: ":name:.:date:.html",
 	ServeDirs:        []httpServeDir{},
+	LogFileName:      "./logs/twserver.log",
+	LogMaxSize:       4,
+	LogMaxBackups:    16,
+	LogMaxAge:        28,
+	LogCompress:      true,
 }
 
-// initLog initializes the log file.
-func initLog(filename string) error {
-	var logFile, err = os.OpenFile(filename, os.O_CREATE|os.O_APPEND, 0644)
+// initLog initializes the logging system.
+func initLog() error {
+	var logDir = filepath.Dir(config.LogFileName)
 
-	if err != nil {
-		return err
+	// Creates the log directory if it doesn't exist
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+			fmt.Printf("[ERROR]initLog: Unable to create the log directory: %v\n", err)
+			return err
+		}
 	}
-	log.SetOutput(logFile)
+
+	log.SetOutput(&lumberjack.Logger{
+		Filename:   config.LogFileName,
+		MaxSize:    config.LogMaxSize,
+		MaxBackups: config.LogMaxBackups,
+		MaxAge:     config.LogMaxAge,
+		Compress:   config.LogCompress,
+	})
 	return nil
 }
 
@@ -143,25 +170,24 @@ func init() {
 	var binPath, err = os.Executable()
 
 	if err != nil {
-		fmt.Println(fmt.Sprintf("[ERROR]init: Unable to get the app binary path: %v", err))
+		fmt.Printf("[ERROR]init: Unable to get the app binary path: %v\n", err)
 		return
 	}
 
 	var binName = strings.TrimSuffix(filepath.Base(binPath), filepath.Ext(binPath))
 	var binDir = filepath.Dir(binPath)
-	var logFilename = filepath.Join(binDir, (binName + ".log"))
 	var confFilename = filepath.Join(binDir, (binName + ".json"))
-
-	// Inits the logs
-	if err := initLog(logFilename); err != nil {
-		fmt.Println(fmt.Sprintf("[ERROR]init: Unable to open/create the log file: %v", err))
-	}
 
 	// Reads the config file if present
 	if _, err := os.Stat(confFilename); err == nil {
 		if err := readConfig(confFilename); err != nil {
-			log.Fatal(fmt.Sprintf("[ERROR]init: Unable to read the configuration file: %v", err))
+			fmt.Printf("[ERROR]init: Unable to read the configuration file: %v\n", err)
 		}
+	}
+
+	// Inits the logging system
+	if err := initLog(); err != nil {
+		fmt.Printf("[ERROR]init: Unable to initialize the logs: %v\n", err)
 	}
 
 	// Creates the backup directory if it doesn't exist
@@ -174,19 +200,39 @@ func init() {
 
 // main starts the HTTP server.
 func main() {
-	http.HandleFunc("/", httpHandleReq)
+	var addr = fmt.Sprintf("%s:%s", config.Host, strconv.Itoa(config.Port))
+	var router = http.NewServeMux()
+	var srv = &http.Server{
+		Addr:    addr,
+		Handler: router,
+	}
+
+	router.HandleFunc("/", httpHandleReq)
 
 	// Serves user-defined directories
 	if len(config.ServeDirs) > 0 {
 		for _, sDir := range config.ServeDirs {
-			http.Handle(sDir.URL, http.StripPrefix(sDir.URL, http.FileServer(http.Dir(sDir.Path))))
+			router.Handle(sDir.URL, http.StripPrefix(sDir.URL, http.FileServer(http.Dir(sDir.Path))))
 		}
 	}
 
-	var bindStr = fmt.Sprintf(":%s", strconv.Itoa(config.Port))
-	fmt.Println(fmt.Sprintf("TW HTTP Server Listening on %s", bindStr))
+	var sigint = make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
 
-	if err := http.ListenAndServe(bindStr, nil); err != nil {
-		log.Fatal(fmt.Sprintf("[ERROR]main: Unable to start the HTTP Server: %v", err))
+	go func() {
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("[ERROR]main: Unable to start the HTTP Server: %v", err)
+		}
+	}()
+
+	log.Println("[INFO]main: HTTP Server started")
+	fmt.Printf("TW HTTP Server Listening on %s\n", addr)
+
+	<-sigint
+
+	log.Println("[INFO]main: HTTP Server stopped")
+
+	if err := srv.Shutdown(context.Background()); err != nil {
+		log.Printf("[ERROR]main: HTTP Server shutdown failed: %v", err)
 	}
 }

@@ -37,35 +37,43 @@ func writeFile(filename string, buf *[]byte) error {
 // zipFile compress the given src file and write it to dest.
 func zipFile(src string, dest string) error {
 	zFile, err := os.Create(dest)
+
 	if err != nil {
 		return fmt.Errorf("archive file creation error: %v", err)
 	}
+
 	defer zFile.Close()
 
 	zWriter := zip.NewWriter(zFile)
 	defer zWriter.Close()
 
 	srcFile, err := os.Open(src)
+
 	if err != nil {
 		return fmt.Errorf("file open error: %v", err)
 	}
+
 	defer srcFile.Close()
 
 	srcInfo, err := srcFile.Stat()
+
 	if err != nil {
 		return fmt.Errorf("file stat error: %v", err)
 	}
 
 	srcHeader, err := zip.FileInfoHeader(srcInfo)
+
 	if err != nil {
 		return fmt.Errorf("file header info error: %v", err)
 	}
-	srcHeader.Method = zip.Deflate
 
+	srcHeader.Method = zip.Deflate
 	zWriter2, err := zWriter.CreateHeader(srcHeader)
+
 	if err != nil {
 		return fmt.Errorf("archive file append error: %v", err)
 	}
+
 	_, err = io.Copy(zWriter2, srcFile)
 	return err
 }
