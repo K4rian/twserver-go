@@ -75,7 +75,7 @@ go build -ldflags "-w -s" github.com/k4rian/twserver-go
 ## Dependencies
 The rotating logging system is powered by [lumberjack][4]:
 ```
-gopkg.in/natefinch/lumberjack.v2="v2.0.0"
+gopkg.in/natefinch/lumberjack.v2="v2.2.1"
 ```
 
 ## Docker Image
